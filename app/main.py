@@ -3,7 +3,8 @@ from models import db,EmployeeModel
  
 app = Flask(__name__,template_folder="./templates")
  
-app.config['SQLALCHEMY_DATABASE_URI'] = 'REPLACE URI'
+#app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://admin:admin123@localhost'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://admin:admin123@test-sabc.cgtxlhowvyge.us-west-2.rds.amazonaws.com/crudapp'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
  

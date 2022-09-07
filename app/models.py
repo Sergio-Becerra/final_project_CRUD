@@ -7,7 +7,7 @@ class EmployeeModel(db.Model):
  
     id = db.Column(db.Integer, primary_key=True)
     employee_id = db.Column(db.Integer(),unique = True)
-    name = db.Column(db.String())
+    name = db.Column(db.String(60))
     age = db.Column(db.Integer())
     position = db.Column(db.String(80))
  
