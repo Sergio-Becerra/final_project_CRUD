@@ -3,7 +3,7 @@ from models import db,EmployeeModel
  
 app = Flask(__name__,template_folder="./templates")
  
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///data.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'REPLACE URI'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
  
@@ -72,5 +72,5 @@ def delete(id):
  
     return render_template('delete.html')
  
-app.run(host='localhost', port=5000)
+app.run(debug=True,host='0.0.0.0', port=5000)
 
