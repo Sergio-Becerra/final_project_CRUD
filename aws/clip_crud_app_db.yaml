@@ -1,0 +1,66 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Resources:
+
+  CrudappDBGroup: 
+    Type: AWS::RDS::DBSubnetGroup
+    Properties: 
+      DBSubnetGroupDescription: String
+      DBSubnetGroupName: String
+      SubnetIds: 
+        - !ImportValue CrudSubnetA
+        - !ImportValue CrudSubnetB
+      Tags: 
+        - Key: Name
+          Value: clip_crud_project_sabc_rds
+
+  SecretDBPass:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: "Secret for RDS databse"
+      GenerateSecretString:
+        ExcludeCharacters: '"@/'
+        GenerateStringKey: "password"
+        PasswordLength: 30
+        RequireEachIncludedType: false
+        SecretStringTemplate: '{"username": "admin"}'
+      Name: "DBPass"
+      Tags:
+        - Key: Name
+          Value: clip_crud_project_sabc_secret_db
+  
+  DBSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: "SgForDB" 
+      GroupDescription: " Security group for database of the project crudapp"
+      VpcId: !ImportValue CrudVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: clip_crud_project_sabc_dbsg
+
+  LogicalID:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      DBSubnetGroupName: !Ref CrudappDBGroup
+      DatabaseName: "crudapp"
+      Engine: "aurora-mysql"
+      EngineMode: "serverless"
+      MasterUsername: !Join ['', ['{{resolve:secretsmanager:', !Ref SecretDBPass, ':SecretString:username}}' ]]
+      MasterUserPassword: !Join ['', ['{{resolve:secretsmanager:', !Ref SecretDBPass, ':SecretString:password}}' ]]
+      ScalingConfiguration:
+        AutoPause: true
+        MaxCapacity: 16
+        MinCapacity: 2
+        SecondsUntilAutoPause: 300
+      Tags:
+        - Key: Name
+          Value: clip_crud_project_sabc_rds
+      UseLatestRestorableTime: false
+      VpcSecurityGroupIds: 
+        - !Ref DBSG

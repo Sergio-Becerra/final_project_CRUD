@@ -1,0 +1,92 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: This is the part 1 of the crud app deployment, deploying all network related
+
+Resources:
+  CrudappVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.42.0/24
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: clip_crud_project_sabc_vpc
+  
+  CrudappIGW:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value: clip_crud_project_sabc_igw
+        
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref CrudappVPC
+      InternetGatewayId: !Ref CrudappIGW
+
+  CrudappRT:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref CrudappVPC
+      Tags:
+        - Key: Name
+          Value: clip_crud_project_sabc_rt
+  
+  InternetRoute:
+    Type: AWS::EC2::Route
+    Properties:
+       RouteTableId: !Ref CrudappRT
+       DestinationCidrBlock: 0.0.0.0/0
+       GatewayId: !Ref CrudappIGW
+
+  CrudappSUBA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [0,Fn::GetAZs: !Ref  AWS::Region]
+      VpcId: !Ref  CrudappVPC
+      CidrBlock: 10.0.42.0/26
+      Tags:
+        - Key: Name
+          Value: clip_crud_project_sabc_sub_a
+    
+  RTAssoSUBA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref CrudappRT
+      SubnetId: !Ref CrudappSUBA
+
+  CrudappSUBB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [1,Fn::GetAZs: !Ref  AWS::Region]
+      VpcId: !Ref  CrudappVPC
+      CidrBlock: 10.0.42.65/26
+      Tags:
+        - Key: Name
+          Value: clip_crud_project_sabc_sub_b
+  
+  RTAssoSUBB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref CrudappRT
+      SubnetId: !Ref CrudappSUBB
+
+Outputs:
+  
+  VPCapp:
+    Description: Vpc for the CRUD project 
+    Value: !Ref CrudappVPC
+    Export: 
+      Name: CrudVPC
+
+  SubnetA:
+    Description: Subnet located on the fist AZ of the region
+    Value: !Ref CrudappSUBA
+    Export: 
+      Name: CrudSubnetA
+  
+  SubnetB:
+    Description: Subnet located on the second AZ of the region
+    Value: !Ref CrudappSUBB
+    Export: 
+      Name: CrudSubnetB
