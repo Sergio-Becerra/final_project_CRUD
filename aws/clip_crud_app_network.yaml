@@ -10,6 +10,8 @@ Resources:
       Tags:
         - Key: Name
           Value: clip_crud_project_sabc_vpc
+
+# ---------- INTERNET GATEWAY ----------------
   
   CrudappIGW:
     Type: AWS::EC2::InternetGateway
@@ -23,6 +25,8 @@ Resources:
     Properties:
       VpcId: !Ref CrudappVPC
       InternetGatewayId: !Ref CrudappIGW
+
+# ---------- ROUTE TABLE DEFAULT ----------------
 
   CrudappRT:
     Type: AWS::EC2::RouteTable
@@ -39,6 +43,7 @@ Resources:
        DestinationCidrBlock: 0.0.0.0/0
        GatewayId: !Ref CrudappIGW
 
+# ---------- SUBNET-A ----------------
   CrudappSUBA:
     Type: AWS::EC2::Subnet
     Properties:
@@ -48,13 +53,15 @@ Resources:
       Tags:
         - Key: Name
           Value: clip_crud_project_sabc_sub_a
+        - Key: Public
+          Value: true
     
   RTAssoSUBA:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !Ref CrudappRT
       SubnetId: !Ref CrudappSUBA
-
+# ---------- SUBNET-B ----------------
   CrudappSUBB:
     Type: AWS::EC2::Subnet
     Properties:
@@ -64,6 +71,8 @@ Resources:
       Tags:
         - Key: Name
           Value: clip_crud_project_sabc_sub_b
+        - Key: Public
+          Value: true
   
   RTAssoSUBB:
     Type: AWS::EC2::SubnetRouteTableAssociation

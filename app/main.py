@@ -11,7 +11,11 @@ db.init_app(app)
 @app.before_first_request
 def create_table():
     db.create_all()
- 
+
+@app.route('/data/create' , methods = ['GET'])
+def mainpage():
+    return render_template('index.html')
+
 @app.route('/data/create' , methods = ['GET','POST'])
 def create():
     if request.method == 'GET':

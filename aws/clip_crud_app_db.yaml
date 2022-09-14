@@ -44,7 +44,7 @@ Resources:
         - Key: Name
           Value: clip_crud_project_sabc_dbsg
 
-  LogicalID:
+  DBCLUSTER:
     Type: AWS::RDS::DBCluster
     Properties:
       DBSubnetGroupName: !Ref CrudappDBGroup

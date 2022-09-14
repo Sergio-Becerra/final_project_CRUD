@@ -1,0 +1,103 @@
+AWSTemplateFormatVersion: "2010-09-09" 
+Parameters:
+    #LatestAmiId:
+     # Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+      #Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+
+    ClusterName:
+      Description: Name of your Amazon ECS Cluster
+      Type: String
+      ConstraintDescription: must be a valid Amazon ECS Cluster.
+      Default: clip_crud_project_sabc_cluster
+Resources:
+  CrudCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Ref ClusterName
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+      Tags:
+        - Key: Name
+          Value: "clip_crud_project_sabc_cluster"
+
+  InstancesSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: InstancesSG
+      GroupDescription: SG for cluster instances
+      VpcId: !ImportValue CrudVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: 0.0.0.0/0
+        
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 200.68.166.27/32
+          
+      Tags:
+        - Key: Name
+          Value: clip_crud_project_sabc_dbsg
+
+  ECSRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: "Role for ecs instances"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      RoleName: "Crudecsrole"
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [ec2.amazonaws.com]
+            Action: ['sts:AssumeRole']
+
+  ECSInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles: [!Ref ECSRole]
+  
+  InstanceKeyPair:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: "ECSInstanceKeyPair2" # Required
+      PublicKeyMaterial: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCNMHmD3hJ9yIgzDK2Qr/M7eenR7+x7C4rqacubMMX5ofsjlLxXD4GjH/VGJbqSLI3aV0tuPRlAPYK10moSOpOhkKd5P4lcsskYwXJ6Iqr6sqDu4dIUqoxN/78wVuxI35WTLIiycMb5ITxivnj/xtqzdC2G+GCZGuFFRKXOoKzZQeuZYVtksesxvdeQS1HlMpHwv2iJFxXgocJGDHK+AvI3JwTsjvCvWMFDpar388V/M2japbiZIgjL+NDar+75si9hqamV6lGnCYf3m18AsqXClmtwzxZNNlHl6Nnc/kbsw9lBDBGZfmwQgsSTpEAIuEyX3/eOGcwq9Z3XJQciTws9 sabc-test-keypair"
+        
+  ContainerInstance:
+    Type: AWS::EC2::Instance
+    DependsOn: CrudCluster
+    Properties:
+      ImageId: ami-014b01f8aa1a38b78
+      KeyName: !Ref InstanceKeyPair
+      InstanceType: t2.small
+      SubnetId: !ImportValue CrudSubnetA 
+      IamInstanceProfile: !Ref ECSInstanceProfile
+      SecurityGroupIds:
+      - Ref: InstancesSG
+      UserData:
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash -xe\n
+            systemctl enable docker
+            echo "ECS_CLUSTER=${ClusterName}" >> /etc/ecs/ecs.config
+            systemctl enable ecs
+            systemctl restart docker && systemctl restart ecs
+
+  IntanceEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      InstanceId: !Ref ContainerInstance  
+
+Outputs:
+  Clusterecs:
+    Description: Cluster for ecs 
+    Value: !Ref CrudCluster 
+    Export: 
+      Name: CrudECS

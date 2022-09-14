@@ -1,0 +1,29 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Resources:        
+  ECSService: 
+    Type: AWS::ECS::Service
+    Properties: 
+      Cluster: !ImportValue CrudECS
+      DesiredCount: 1
+      TaskDefinition: !Ref CrudTasKDefinition 
+
+  CrudTasKDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      ContainerDefinitions:
+        - 
+          Name: "clip_crud_project_sabc_container"
+          Image: 109832253823.dkr.ecr.us-west-2.amazonaws.com/test-sabc:latest
+          PortMappings:
+            -
+              ContainerPort: 5000
+              HostPort: 5000
+              Protocol: "tcp"
+
+      Cpu: "256"
+      Memory: "512"
+      Tags:
+        - Key: Name
+          Value: "clip_crud_project_sabc_task_definition"
+
