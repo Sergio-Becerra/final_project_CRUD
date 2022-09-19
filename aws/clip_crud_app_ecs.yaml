@@ -1,8 +1,8 @@
 AWSTemplateFormatVersion: "2010-09-09" 
 Parameters:
-    #LatestAmiId:
-     # Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
-      #Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+    LatestAmiId:
+      Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+      Default: '/aws/service/ecs/optimized-ami/amazon-linux-2/recommended/image_id'
 
     ClusterName:
       Description: Name of your Amazon ECS Cluster
@@ -10,37 +10,19 @@ Parameters:
       ConstraintDescription: must be a valid Amazon ECS Cluster.
       Default: clip_crud_project_sabc_cluster
 Resources:
+
   CrudCluster:
     Type: AWS::ECS::Cluster
     Properties:
       ClusterName: !Ref ClusterName
+      CapacityProviders:
+        - !Ref ECSCapProvider
       ClusterSettings:
         - Name: containerInsights
           Value: enabled
       Tags:
         - Key: Name
           Value: "clip_crud_project_sabc_cluster"
-
-  InstancesSG:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupName: InstancesSG
-      GroupDescription: SG for cluster instances
-      VpcId: !ImportValue CrudVPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 3306
-          ToPort: 3306
-          CidrIp: 0.0.0.0/0
-        
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: 200.68.166.27/32
-          
-      Tags:
-        - Key: Name
-          Value: clip_crud_project_sabc_dbsg
 
   ECSRole:
     Type: AWS::IAM::Role
@@ -68,32 +50,76 @@ Resources:
     Properties:
       KeyName: "ECSInstanceKeyPair2" # Required
       PublicKeyMaterial: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCNMHmD3hJ9yIgzDK2Qr/M7eenR7+x7C4rqacubMMX5ofsjlLxXD4GjH/VGJbqSLI3aV0tuPRlAPYK10moSOpOhkKd5P4lcsskYwXJ6Iqr6sqDu4dIUqoxN/78wVuxI35WTLIiycMb5ITxivnj/xtqzdC2G+GCZGuFFRKXOoKzZQeuZYVtksesxvdeQS1HlMpHwv2iJFxXgocJGDHK+AvI3JwTsjvCvWMFDpar388V/M2japbiZIgjL+NDar+75si9hqamV6lGnCYf3m18AsqXClmtwzxZNNlHl6Nnc/kbsw9lBDBGZfmwQgsSTpEAIuEyX3/eOGcwq9Z3XJQciTws9 sabc-test-keypair"
-        
-  ContainerInstance:
-    Type: AWS::EC2::Instance
-    DependsOn: CrudCluster
+
+  ECSLaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
-      ImageId: ami-014b01f8aa1a38b78
-      KeyName: !Ref InstanceKeyPair
-      InstanceType: t2.small
-      SubnetId: !ImportValue CrudSubnetA 
       IamInstanceProfile: !Ref ECSInstanceProfile
-      SecurityGroupIds:
-      - Ref: InstancesSG
+      ImageId: !Ref LatestAmiId 
+      InstanceMonitoring: true
+      InstanceType: t2.small 
+      KeyName: !Ref InstanceKeyPair
+      SecurityGroups:
+      - !ImportValue APPSG
+      AssociatePublicIpAddress: true
       UserData:
         Fn::Base64:
           !Sub |
-            #!/bin/bash -xe\n
-            systemctl enable docker
+            #!/bin/bash -xe
             echo "ECS_CLUSTER=${ClusterName}" >> /etc/ecs/ecs.config
-            systemctl enable ecs
-            systemctl restart docker && systemctl restart ecs
-
-  IntanceEIP:
-    Type: AWS::EC2::EIP
+            systemctl enable --now --no-block ecs.service
+            systemctl enable --now --no-block ecs.service
+    
+  APPAGS:
+    Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
-      Domain: vpc
-      InstanceId: !Ref ContainerInstance  
+      VPCZoneIdentifier:
+        - !ImportValue AppSubnetA
+        - !ImportValue AppSubnetB
+      LaunchConfigurationName: !Ref ECSLaunchConfig
+      MinSize: 2
+      MaxSize: 6
+      Tags:
+        - Key: Owner
+          Value: Sergio Becerra
+          PropagateAtLaunch: true  
+  
+  ECSCapProvider:
+    Type: AWS::ECS::CapacityProvider
+    Properties:
+      AutoScalingGroupProvider:
+        AutoScalingGroupArn: !Ref APPAGS
+        ManagedScaling:
+          Status: ENABLED
+      Name: "Crud-project"
+
+#  ContainerInstance:
+#    Type: AWS::EC2::Instance
+#    DependsOn: CrudCluster
+#    Properties:
+##      ImageId: ami-014b01f8aa1a38b78
+#      ImageId: !Ref LatestAmiId 
+#      KeyName: !Ref InstanceKeyPair
+#      InstanceType: t2.small
+#      SubnetId: !ImportValue CrudSubnetA 
+#      IamInstanceProfile: !Ref ECSInstanceProfile
+#      SecurityGroupIds:
+#      - !ImportValue APPSGE
+#      
+#      UserData:
+#        Fn::Base64:
+#          !Sub |
+#            #!/bin/bash -xe\n
+#            systemctl enable docker
+#            echo "ECS_CLUSTER=${ClusterName}" >> /etc/ecs/ecs.config
+#            systemctl enable ecs
+#            systemctl restart docker && systemctl restart ecs
+#
+#  IntanceEIP:
+#    Type: AWS::EC2::EIP
+#    Properties:
+#      Domain: vpc
+#      InstanceId: !Ref ContainerInstance  
 
 Outputs:
   Clusterecs:

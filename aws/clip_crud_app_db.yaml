@@ -2,17 +2,21 @@ AWSTemplateFormatVersion: "2010-09-09"
 
 Resources:
 
+# ---------- SUBNET GROUP ----------------
   CrudappDBGroup: 
     Type: AWS::RDS::DBSubnetGroup
     Properties: 
       DBSubnetGroupDescription: String
       DBSubnetGroupName: String
       SubnetIds: 
-        - !ImportValue CrudSubnetA
-        - !ImportValue CrudSubnetB
+        - !ImportValue DBSubnetA 
+        - !ImportValue DBSubnetB
       Tags: 
         - Key: Name
           Value: clip_crud_project_sabc_rds
+
+
+# ---------- SECRETS AND SSM ----------------
 
   SecretDBPass:
     Type: AWS::SecretsManager::Secret
@@ -29,20 +33,15 @@ Resources:
         - Key: Name
           Value: clip_crud_project_sabc_secret_db
   
-  DBSG:
-    Type: AWS::EC2::SecurityGroup
+  SSMDBEndPoint:
+    Type: AWS::SSM::Parameter
     Properties:
-      GroupName: "SgForDB" 
-      GroupDescription: " Security group for database of the project crudapp"
-      VpcId: !ImportValue CrudVPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 3306
-          ToPort: 3306
-          CidrIp: 0.0.0.0/0
-      Tags:
-        - Key: Name
-          Value: clip_crud_project_sabc_dbsg
+      Description: "DB cluster endpoint"
+      Name: /SABC/CrudProject/RDS/EndPoint
+      Type: String 
+      Value: !GetAtt DBCLUSTER.Endpoint.Address
+
+# ---------- DB CLUSTER ----------------
 
   DBCLUSTER:
     Type: AWS::RDS::DBCluster
@@ -63,4 +62,5 @@ Resources:
           Value: clip_crud_project_sabc_rds
       UseLatestRestorableTime: false
       VpcSecurityGroupIds: 
-        - !Ref DBSG
+        - !ImportValue DBSG
+

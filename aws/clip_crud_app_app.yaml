@@ -18,7 +18,7 @@ Resources:
           PortMappings:
             -
               ContainerPort: 5000
-              HostPort: 5000
+              HostPort: 0
               Protocol: "tcp"
 
       Cpu: "256"

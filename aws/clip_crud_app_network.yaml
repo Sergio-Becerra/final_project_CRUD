@@ -2,11 +2,13 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: This is the part 1 of the crud app deployment, deploying all network related
 
 Resources:
-  CrudappVPC:
+# ---------- VPC ----------------
+  VPC:
     Type: AWS::EC2::VPC
     Properties:
-      CidrBlock: 10.0.42.0/24
+      CidrBlock: 10.0.42.0/25
       EnableDnsSupport: true
+      EnableDnsHostnames: true
       Tags:
         - Key: Name
           Value: clip_crud_project_sabc_vpc
@@ -23,79 +25,267 @@ Resources:
   AttachGateway:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
-      VpcId: !Ref CrudappVPC
+      VpcId:  !Ref VPC
       InternetGatewayId: !Ref CrudappIGW
 
-# ---------- ROUTE TABLE DEFAULT ----------------
+# ---------- ROUTE TABLE Public ----------------
 
-  CrudappRT:
+  PublicRT:
     Type: AWS::EC2::RouteTable
     Properties:
-      VpcId: !Ref CrudappVPC
+      VpcId:  !Ref VPC
       Tags:
         - Key: Name
-          Value: clip_crud_project_sabc_rt
+          Value: clip_crud_project_sabc_public
   
   InternetRoute:
     Type: AWS::EC2::Route
     Properties:
-       RouteTableId: !Ref CrudappRT
+       RouteTableId: !Ref PublicRT
        DestinationCidrBlock: 0.0.0.0/0
        GatewayId: !Ref CrudappIGW
 
-# ---------- SUBNET-A ----------------
-  CrudappSUBA:
+# ---------- Pubilc subnet ----------------
+
+  PublicSubnet:
     Type: AWS::EC2::Subnet
     Properties:
       AvailabilityZone: !Select [0,Fn::GetAZs: !Ref  AWS::Region]
-      VpcId: !Ref  CrudappVPC
-      CidrBlock: 10.0.42.0/26
+      VpcId:  !Ref VPC
+      CidrBlock: 10.0.42.0/28
       Tags:
         - Key: Name
-          Value: clip_crud_project_sabc_sub_a
+          Value: clip-crud-project-sabc-public-sub
         - Key: Public
-          Value: true
-    
-  RTAssoSUBA:
+          Value: false
+
+  PublicSubRTASSO:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref CrudappRT
-      SubnetId: !Ref CrudappSUBA
-# ---------- SUBNET-B ----------------
-  CrudappSUBB:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRT
+    
+# ************************* DATABASE ***********************************
+  DBSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: "SgForDB" 
+      GroupDescription: " Security group for database of the project crudapp"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref APPSG
+      Tags:
+        - Key: Name
+          Value: clip_crud_project_sabc_dbsg
+
+# ---------- DB SUBNET-A ----------------
+# TODO:
+# Add NAT and routetable association
+
+  DBSubA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [0,Fn::GetAZs: !Ref  AWS::Region]
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.42.16/28
+      Tags:
+        - Key: Name
+          Value: clip_crud_project_sabc_db_sub_a
+        - Key: Public
+          Value: false
+
+    
+# ----------  DB SUBNET-B ----------------
+# TODO:
+# Add NAT and routetable association
+
+  DBSubB:
     Type: AWS::EC2::Subnet
     Properties:
       AvailabilityZone: !Select [1,Fn::GetAZs: !Ref  AWS::Region]
-      VpcId: !Ref  CrudappVPC
-      CidrBlock: 10.0.42.65/26
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.42.32/28
       Tags:
         - Key: Name
-          Value: clip_crud_project_sabc_sub_b
+          Value: clip_crud_project_sabc_db_sub_b
         - Key: Public
-          Value: true
+          Value: false
+
+# ************************* APP ***********************************
+  APPSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: InstancesSG
+      GroupDescription: SG for cluster instances
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: 0.0.0.0/0
+        
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 187.198.144.219/32
+          
+      Tags:
+        - Key: Name
+          Value: clip_crud_project_sabc_dbsg
+# ---------- APP SUBNET-A ----------------
+# TODO:
+# Add NAT and routetable association
+
+  AppSubA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [0,Fn::GetAZs: !Ref  AWS::Region]
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.42.64/27
+      Tags:
+        - Key: Name
+          Value: clip_crud_project_sabc_app_sub_a
+        - Key: Public
+          Value: false
   
-  RTAssoSUBB:
+  TESTublicSubRTASSO:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref CrudappRT
-      SubnetId: !Ref CrudappSUBB
+      SubnetId: !Ref DBSubA
+      RouteTableId: !Ref PublicRT
+    
+# ----------  APP SUBNET-B ----------------
+# TODO:
+# Add NAT and routetable association
+
+  AppSubB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [1,Fn::GetAZs: !Ref  AWS::Region]
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.42.96/27
+      Tags:
+        - Key: Name
+          Value: clip_crud_project_sabc_app_sub_b
+        - Key: Public
+          Value: false
+
+
+# ----------  ECR ENDPOINTS ----------------
+
+  ECSInterfaceEndpoint1:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      VpcEndpointType: Interface
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ecs-agent'
+      VpcId: !Ref VPC
+      SubnetIds: 
+        - !Ref AppSubA
+        - !Ref AppSubB
+      SecurityGroupIds:
+        - !Ref APPSG
+  
+  ECSInterfaceEndpoint2:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      PrivateDnsEnabled: true
+      VpcEndpointType: Interface
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ecs-telemetry'
+      VpcId: !Ref VPC
+      SubnetIds: 
+        - !Ref AppSubA
+        - !Ref AppSubB
+      SecurityGroupIds:
+        - !Ref APPSG
+        
+  ECSInterfaceEndpoint3:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      PrivateDnsEnabled: true
+      VpcEndpointType: Interface
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ecs'
+      VpcId: !Ref VPC
+      SubnetIds: 
+        - !Ref AppSubA
+        - !Ref AppSubB
+      SecurityGroupIds:
+        - !Ref APPSG
+
+# ----------  ECR ENDPOINTS ----------------
+
+  ECRInterfaceEndpoint1:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      VpcEndpointType: Interface
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ecr.api'
+      VpcId: !Ref VPC
+      SubnetIds: 
+        - !Ref AppSubA
+        - !Ref AppSubB
+      SecurityGroupIds:
+        - !Ref APPSG
+  
+  ECRInterfaceEndpoint2:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      PrivateDnsEnabled: true
+      VpcEndpointType: Interface
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ecr.dkr'
+      VpcId: !Ref VPC
+      SubnetIds: 
+        - !Ref AppSubA
+        - !Ref AppSubB
+      SecurityGroupIds:
+        - !Ref APPSG
 
 Outputs:
-  
-  VPCapp:
+
+  VPCE:
     Description: Vpc for the CRUD project 
-    Value: !Ref CrudappVPC
+    Value:  !Ref VPC
     Export: 
       Name: CrudVPC
 
-  SubnetA:
-    Description: Subnet located on the fist AZ of the region
-    Value: !Ref CrudappSUBA
+  DBSGE:
+    Description: Export for security group for DB 
+    Value: !Ref DBSG
     Export: 
-      Name: CrudSubnetA
+      Name: DBSG
+
+  DBSubAE:
+    Description: DB Subnet located on the fist AZ of the region
+    Value: !Ref AppSubA
+    Export: 
+      Name: DBSubnetA
   
-  SubnetB:
-    Description: Subnet located on the second AZ of the region
-    Value: !Ref CrudappSUBB
+  DBSubBE:
+    Description: DB Subnet located on the second AZ of the region
+    Value: !Ref AppSubB
     Export: 
-      Name: CrudSubnetB
+      Name: DBSubnetB
+
+  APPSGE:
+    Description: Export for security group for APP 
+    Value: !Ref APPSG
+    Export: 
+      Name: APPSG
+
+  AppSubAE:
+    Description: APP Subnet located on the fist AZ of the region
+    Value: !Ref AppSubA
+    Export: 
+      Name: AppSubnetA
+  
+  AppSubBE:
+    Description: APP Subnet located on the second AZ of the region
+    Value: !Ref AppSubB
+    Export: 
+      Name: AppSubnetB
