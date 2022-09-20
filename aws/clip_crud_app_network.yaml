@@ -28,7 +28,38 @@ Resources:
       VpcId:  !Ref VPC
       InternetGatewayId: !Ref CrudappIGW
 
-# ---------- ROUTE TABLE Public ----------------
+
+# ---------- PRIVATE RT AND NAT GATEWAY ----------------
+  CrudNat:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NATGatewayEIP.AllocationId
+      SubnetId: !Ref PublicSubA
+      Tags:
+        - Key: Name
+          Value: clip-crud-project-sabc-NAT-Gateway
+  
+  NATGatewayEIP: 
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+  
+  PrivateRT:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: clip_crud_project_sabc_private_rt
+  
+  NatRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRT
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref CrudNat
+
+# ---------- ROUTE TABLE PUBLIC ----------------
 
   PublicRT:
     Type: AWS::EC2::RouteTable
@@ -45,9 +76,9 @@ Resources:
        DestinationCidrBlock: 0.0.0.0/0
        GatewayId: !Ref CrudappIGW
 
-# ---------- Pubilc subnet ----------------
+# ---------- PUBLIC SUBNETS----------------
 
-  PublicSubnet:
+  PublicSubA:
     Type: AWS::EC2::Subnet
     Properties:
       AvailabilityZone: !Select [0,Fn::GetAZs: !Ref  AWS::Region]
@@ -55,14 +86,32 @@ Resources:
       CidrBlock: 10.0.42.0/28
       Tags:
         - Key: Name
-          Value: clip-crud-project-sabc-public-sub
+          Value: clip-crud-project-sabc-public-sub-a
         - Key: Public
-          Value: false
+          Value: true
 
-  PublicSubRTASSO:
+  PublicSubB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [1,Fn::GetAZs: !Ref  AWS::Region]
+      VpcId:  !Ref VPC
+      CidrBlock: 10.0.42.16/28
+      Tags:
+        - Key: Name
+          Value: clip-crud-project-sabc-public-sub-b
+        - Key: Public
+          Value: true
+
+  PublicSubRTASSOA:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref PublicSubnet
+      SubnetId: !Ref PublicSubA
+      RouteTableId: !Ref PublicRT
+  
+  PublicSubRTASSOB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubB
       RouteTableId: !Ref PublicRT
     
 # ************************* DATABASE ***********************************
@@ -90,14 +139,19 @@ Resources:
     Properties:
       AvailabilityZone: !Select [0,Fn::GetAZs: !Ref  AWS::Region]
       VpcId: !Ref VPC
-      CidrBlock: 10.0.42.16/28
+      CidrBlock: 10.0.42.32/28
       Tags:
         - Key: Name
           Value: clip_crud_project_sabc_db_sub_a
         - Key: Public
           Value: false
-
-    
+  
+  DBSubARTASSO:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref DBSubA
+      RouteTableId: !Ref PrivateRT
+  
 # ----------  DB SUBNET-B ----------------
 # TODO:
 # Add NAT and routetable association
@@ -107,12 +161,19 @@ Resources:
     Properties:
       AvailabilityZone: !Select [1,Fn::GetAZs: !Ref  AWS::Region]
       VpcId: !Ref VPC
-      CidrBlock: 10.0.42.32/28
+      CidrBlock: 10.0.42.48/28
       Tags:
         - Key: Name
           Value: clip_crud_project_sabc_db_sub_b
         - Key: Public
           Value: false
+          
+  DBSubBRTASSO:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref DBSubB
+      RouteTableId: !Ref PrivateRT
+
 
 # ************************* APP ***********************************
   APPSG:
@@ -156,12 +217,11 @@ Resources:
         - Key: Public
           Value: false
   
-  TESTublicSubRTASSO:
+  AppSubARTASSO:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref DBSubA
-      RouteTableId: !Ref PublicRT
-    
+      SubnetId: !Ref AppSubA
+      RouteTableId: !Ref PrivateRT
 # ----------  APP SUBNET-B ----------------
 # TODO:
 # Add NAT and routetable association
@@ -178,7 +238,13 @@ Resources:
         - Key: Public
           Value: false
 
+  AppSubBRTASSO:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref AppSubB
+      RouteTableId: !Ref PrivateRT
 
+# ************************* ENDPOINTS ***********************************
 # ----------  ECR ENDPOINTS ----------------
 
   ECSInterfaceEndpoint1:
@@ -289,3 +355,15 @@ Outputs:
     Value: !Ref AppSubB
     Export: 
       Name: AppSubnetB
+
+  PublicSubAE:
+    Description: Public Subnet located on the fist AZ of the region
+    Value: !Ref PublicSubA
+    Export: 
+      Name: PublicSubA
+  
+  PublicSubBE:
+    Description: Public Subnet located on the second AZ of the region
+    Value: !Ref PublicSubB
+    Export: 
+      Name: PublicSubB

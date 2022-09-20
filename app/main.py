@@ -12,7 +12,7 @@ db.init_app(app)
 def create_table():
     db.create_all()
 
-@app.route('/data/create' , methods = ['GET'])
+@app.route('/' , methods = ['GET'])
 def mainpage():
     return render_template('index.html')
 
