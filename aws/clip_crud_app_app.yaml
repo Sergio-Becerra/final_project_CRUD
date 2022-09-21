@@ -1,6 +1,41 @@
 AWSTemplateFormatVersion: "2010-09-09"
 
 Resources:        
+
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ecs-tasks.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      RoleName: crud-sabc-ecs-task-role
+      Policies:
+      - PolicyName: crud-sabc-policy-read-secrets
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - "secretsmanager:GetSecretValue"
+            Resource: 
+              - !ImportValue SecretDB
+      - PolicyName: crud-sabc-policy-read-ssm
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - "ssm:GetParameter"
+            Resource: 
+              -  "*"
+
   ECSService: 
     Type: AWS::ECS::Service
     Properties: 
@@ -11,6 +46,7 @@ Resources:
   CrudTasKDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
+      ExecutionRoleArn: !GetAtt TaskRole.Arn
       ContainerDefinitions:
         - 
           Name: "clip_crud_project_sabc_container"

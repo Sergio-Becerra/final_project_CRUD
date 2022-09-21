@@ -1,10 +1,22 @@
 from flask import Flask,render_template,request,redirect
 from models import db,EmployeeModel
- 
+import boto3
+import json
+# GET DB CREDENTIALS
+secretmng = boto3.client('secretsmanager')
+ssm = boto3.client('ssm')
+secret = secretmng.get_secret_value(SecretId='DBPass')
+database_secrets = json.loads(secret['SecretString'])
+db_pass = database_secrets['password']
+db_username = database_secrets['username']
+db_ssm = ssm.get_parameter(Name='/SABC/CrudProject/RDS/EndPoint')
+db_endpoind = db_ssm['Parameter']['Value'] 
+
 app = Flask(__name__,template_folder="./templates")
  
 #app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://admin:admin123@localhost'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://admin:admin123@test-sabc.cgtxlhowvyge.us-west-2.rds.amazonaws.com/crudapp'
+db_uri = f"mysql://{db_username}:{db_pass}@{db_endpoind}/crudapp"
+app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
  

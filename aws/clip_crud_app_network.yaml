@@ -28,7 +28,6 @@ Resources:
       VpcId:  !Ref VPC
       InternetGatewayId: !Ref CrudappIGW
 
-
 # ---------- PRIVATE RT AND NAT GATEWAY ----------------
   CrudNat:
     Type: AWS::EC2::NatGateway
@@ -174,7 +173,6 @@ Resources:
       SubnetId: !Ref DBSubB
       RouteTableId: !Ref PrivateRT
 
-
 # ************************* APP ***********************************
   APPSG:
     Type: AWS::EC2::SecurityGroup
@@ -202,8 +200,6 @@ Resources:
         - Key: Name
           Value: clip_crud_project_sabc_dbsg
 # ---------- APP SUBNET-A ----------------
-# TODO:
-# Add NAT and routetable association
 
   AppSubA:
     Type: AWS::EC2::Subnet
@@ -222,9 +218,8 @@ Resources:
     Properties:
       SubnetId: !Ref AppSubA
       RouteTableId: !Ref PrivateRT
+
 # ----------  APP SUBNET-B ----------------
-# TODO:
-# Add NAT and routetable association
 
   AppSubB:
     Type: AWS::EC2::Subnet

@@ -9,6 +9,7 @@ Parameters:
       Type: String
       ConstraintDescription: must be a valid Amazon ECS Cluster.
       Default: clip_crud_project_sabc_cluster
+
 Resources:
 
   CrudCluster:
@@ -73,7 +74,6 @@ Resources:
             systemctl restart --now --noblock docker
             systemctl restart --now --noblock ecs
             
-       
   AppASG:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:

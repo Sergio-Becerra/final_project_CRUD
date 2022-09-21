@@ -64,3 +64,10 @@ Resources:
       VpcSecurityGroupIds: 
         - !ImportValue DBSG
 
+Outputs:
+  SecretDBPassE:
+    Description: ARN from the secrect for the db credentials 
+    Value: !Ref SecretDBPass
+    Export: 
+      Name: SecretDB
+  
