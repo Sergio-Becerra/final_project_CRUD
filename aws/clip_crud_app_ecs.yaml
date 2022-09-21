@@ -40,39 +40,6 @@ Resources:
               Service: 
               - ec2.amazonaws.com
             Action: ['sts:AssumeRole']
-      Policies:
-      - PolicyName: crud-sabc-policy-read-secrets2
-        PolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-          - Effect: Allow
-            Action:
-            - "secretsmanager:GetSecretValue"
-            Resource: 
-              - !ImportValue SecretDB
-      - PolicyName: crud-sabc-policy-read-ssm2
-        PolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-          - Effect: Allow
-            Action:
-            - "ssm:GetParameter"
-            Resource: 
-              -  "*"
-      - PolicyName: crud-sabc-policy-ecr2
-        PolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-          - Effect: Allow
-            Action:
-            - "ecr:GetAuthorizationToken"
-            - "ecr:BatchCheckLayerAvailability"
-            - "ecr:GetDownloadUrlForLayer"
-            - "ecr:BatchGetImage"
-            - "logs:CreateLogStream"
-            - "logs:PutLogEvents"
-            Resource: 
-              -  "*"
 
   ECSInstanceProfile:
     Type: AWS::IAM::InstanceProfile
@@ -115,10 +82,11 @@ Resources:
         - !ImportValue AppSubnetA
         - !ImportValue AppSubnetB
       LaunchConfigurationName: !Ref ECSLaunchConfig
+      HealthCheckGracePeriod: 120
       MinSize: 2
       MaxSize: 6
-      TargetGroupARNs:
-        - !Ref AppTargetGroup
+      #TargetGroupARNs:
+      #  - !Ref AppTargetGroup
       Tags:
         - Key: Owner
           Value: Sergio Becerra
@@ -142,8 +110,8 @@ Resources:
       VpcId: !ImportValue CrudVPC
       SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: 5000
-          ToPort: 5000
+          FromPort: 8080
+          ToPort: 8080
           CidrIp: 0.0.0.0/0
       Tags:
         - Key: Name
@@ -162,28 +130,6 @@ Resources:
         - !ImportValue PublicSubB
       Type: "application"
 
-  LBListener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties:
-      DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref AppTargetGroup
-      LoadBalancerArn: !Ref AppLB
-      Port: 5000
-      Protocol: "HTTP"
-
-  AppTargetGroup:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Properties:
-      Name: "Crud-project-sabc"
-      Port: 5000
-      Protocol: "HTTP"
-      TargetType: "instance"
-      VpcId: !ImportValue CrudVPC
-      Tags:
-        - Key: Name
-          Value: crud-sabc-tg
-
 Outputs:
 
   Clusterecs:
@@ -191,3 +137,9 @@ Outputs:
     Value: !Ref CrudCluster 
     Export: 
       Name: CrudECS
+  
+  APPLBE:
+    Description: Load Balancer for crud app 
+    Value: !Ref AppLB
+    Export: 
+      Name: AppLBE
