@@ -35,6 +35,20 @@ Resources:
             - "ssm:GetParameter"
             Resource: 
               -  "*"
+      - PolicyName: crud-sabc-policy-ecr
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - "ecr:GetAuthorizationToken"
+            - "ecr:BatchCheckLayerAvailability"
+            - "ecr:GetDownloadUrlForLayer"
+            - "ecr:BatchGetImage"
+            - "logs:CreateLogStream"
+            - "logs:PutLogEvents"
+            Resource: 
+              -  "*"
 
   ECSService: 
     Type: AWS::ECS::Service
@@ -54,8 +68,11 @@ Resources:
           PortMappings:
             -
               ContainerPort: 5000
-              HostPort: 0
+              HostPort: 5000
               Protocol: "tcp"
+          Environment:
+            - Name: AWS_DEFAULT_REGION
+              Value: !Ref AWS::Region
 
       Cpu: "256"
       Memory: "512"
