@@ -12,6 +12,7 @@ Parameters:
 
 Resources:
 
+# ---------- CLUSTER ----------------
   CrudCluster:
     Type: AWS::ECS::Cluster
     Properties:
@@ -24,7 +25,17 @@ Resources:
       Tags:
         - Key: Name
           Value: "clip_crud_project_sabc_cluster"
+  
+  ECSCapProvider:
+    Type: AWS::ECS::CapacityProvider
+    Properties:
+      AutoScalingGroupProvider:
+        AutoScalingGroupArn: !Ref AppASG
+        ManagedScaling:
+          Status: ENABLED
+      Name: "Crud-project"
 
+# ---------- ROLE FOR INSTANCES ----------------
   ECSRole:
     Type: AWS::IAM::Role
     Properties:
@@ -47,13 +58,7 @@ Resources:
       Path: /
       Roles: [!Ref ECSRole]
   
-  InstanceKeyPair:
-    Type: AWS::EC2::KeyPair
-    Properties:
-      KeyName: "ECSInstanceKeyPair2" # Required
-      PublicKeyMaterial: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCNMHmD3hJ9yIgzDK2Qr/M7eenR7+x7C4rqacubMMX5ofsjlLxXD4GjH/VGJbqSLI3aV0tuPRlAPYK10moSOpOhkKd5P4lcsskYwXJ6Iqr6sqDu4dIUqoxN/78wVuxI35WTLIiycMb5ITxivnj/xtqzdC2G+GCZGuFFRKXOoKzZQeuZYVtksesxvdeQS1HlMpHwv2iJFxXgocJGDHK+AvI3JwTsjvCvWMFDpar388V/M2japbiZIgjL+NDar+75si9hqamV6lGnCYf3m18AsqXClmtwzxZNNlHl6Nnc/kbsw9lBDBGZfmwQgsSTpEAIuEyX3/eOGcwq9Z3XJQciTws9 sabc-test-keypair"
-
-# ************************* AUTOSCALING ***********************************
+# ---------- LAUNCH CONFIG AND AUTOSCALING ----------------
   ECSLaunchConfig:
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
@@ -61,7 +66,6 @@ Resources:
       ImageId: !Ref LatestAmiId 
       InstanceMonitoring: true
       InstanceType: t2.small 
-      KeyName: !Ref InstanceKeyPair
       SecurityGroups:
       - !ImportValue APPSG
       AssociatePublicIpAddress: false
@@ -83,52 +87,84 @@ Resources:
         - !ImportValue AppSubnetB
       LaunchConfigurationName: !Ref ECSLaunchConfig
       HealthCheckGracePeriod: 120
+      MetricsCollection:
+        - Granularity: "1Minute"
+          Metrics:
+            - GroupDesiredCapacity
+            - GroupMaxSize
+            - GroupMinSize
       MinSize: 2
       MaxSize: 6
-      #TargetGroupARNs:
-      #  - !Ref AppTargetGroup
       Tags:
         - Key: Owner
           Value: Sergio Becerra
           PropagateAtLaunch: true  
   
-  ECSCapProvider:
-    Type: AWS::ECS::CapacityProvider
-    Properties:
-      AutoScalingGroupProvider:
-        AutoScalingGroupArn: !Ref AppASG
-        ManagedScaling:
-          Status: ENABLED
-      Name: "Crud-project"
-
-# ************************* LOAD BALANCER ***********************************
-  LBSC:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupName: "SgForLB" 
-      GroupDescription: " Security group for Load Balancer"
-      VpcId: !ImportValue CrudVPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 8080
-          ToPort: 8080
-          CidrIp: 0.0.0.0/0
-      Tags:
-        - Key: Name
-          Value: clip_crud_project_sabc_lbsg
+# ---------- LOAD BALANCER ----------------
 
   AppLB:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
       IpAddressType: "ipv4"
-      Name: "AppLB"
+      Name: "CRUDAppLB"
       Scheme: "internet-facing"
       SecurityGroups:
-        - !Ref LBSC
+        - !ImportValue  LBSC
       Subnets: 
         - !ImportValue PublicSubA
         - !ImportValue PublicSubB
       Type: "application"
+      Tags:
+        - Key: Name
+          Value: "clip_crud_project_sabc_LB"
+
+
+# ---------- DESIRED CAPACITY ALARM ----------------
+
+  AGSDesiredCapacity:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Alarm for changes in the AGS desired capacity to a lower level 
+      AlarmActions: 
+        - !Ref EmailSNS
+      MetricName: GroupDesiredCapacity
+      Namespace: AWS/AutoScaling
+      Statistic: Minimum
+      Period: '60'
+      EvaluationPeriods: '3'
+      Threshold: '1'
+      ComparisonOperator: LessThanOrEqualToThreshold
+      Dimensions:
+      - Name: AutoScalingGroupName
+        Value: !Ref AppASG
+
+  AGSDesiredCapacityDemo:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Alarm for changes in the AGS desired capacity to a lower level 
+      AlarmActions: 
+        - !Ref EmailSNS
+      MetricName: GroupDesiredCapacity
+      Namespace: AWS/AutoScaling
+      Statistic: Minimum
+      Period: '10'
+      EvaluationPeriods: '1'
+      Threshold: '1'
+      ComparisonOperator: LessThanOrEqualToThreshold
+      Dimensions:
+      - Name: AutoScalingGroupName
+        Value: !Ref AppASG
+
+  EmailSNS: 
+    Type: AWS::SNS::Topic
+    Properties: 
+      Subscription: 
+        - Endpoint: "sergio.becerra@payclip.com"
+          Protocol: "email"
+      TopicName: "Alarmcpu" 
+      Tags:
+        - Key: Name
+          Value: "clip_crud_project_sabc_sns_topic"
 
 Outputs:
 
@@ -143,3 +179,9 @@ Outputs:
     Value: !Ref AppLB
     Export: 
       Name: AppLBE
+
+  EmailSNSE:
+    Description: Email sns export 
+    Value: !Ref EmailSNS
+    Export: 
+      Name: EmailSNS

@@ -2,7 +2,9 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: This is the part 1 of the crud app deployment, deploying all network related
 
 Resources:
+
 # ---------- VPC ----------------
+
   VPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -89,6 +91,12 @@ Resources:
         - Key: Public
           Value: true
 
+  PublicSubRTASSOA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubA
+      RouteTableId: !Ref PublicRT
+
   PublicSubB:
     Type: AWS::EC2::Subnet
     Properties:
@@ -101,17 +109,27 @@ Resources:
         - Key: Public
           Value: true
 
-  PublicSubRTASSOA:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: !Ref PublicSubA
-      RouteTableId: !Ref PublicRT
-  
   PublicSubRTASSOB:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       SubnetId: !Ref PublicSubB
       RouteTableId: !Ref PublicRT
+
+# ---------- LoadBalancer SG ----------------
+  LBSC:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: "SgForLB" 
+      GroupDescription: " Security group for Load Balancer"
+      VpcId: !ImportValue CrudVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: clip_crud_project_sabc_lbsg
     
 # ************************* DATABASE ***********************************
   DBSG:
@@ -130,8 +148,6 @@ Resources:
           Value: clip_crud_project_sabc_dbsg
 
 # ---------- DB SUBNET-A ----------------
-# TODO:
-# Add NAT and routetable association
 
   DBSubA:
     Type: AWS::EC2::Subnet
@@ -152,8 +168,6 @@ Resources:
       RouteTableId: !Ref PrivateRT
   
 # ----------  DB SUBNET-B ----------------
-# TODO:
-# Add NAT and routetable association
 
   DBSubB:
     Type: AWS::EC2::Subnet
@@ -182,23 +196,19 @@ Resources:
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: 3306
-          ToPort: 3306
-          CidrIp: 0.0.0.0/0
-        
+          FromPort: 0
+          ToPort: 65535
+          SourceSecurityGroupId: !Ref LBSC
+
         - IpProtocol: tcp
           FromPort: 443
           ToPort: 443
           CidrIp: 0.0.0.0/0
 
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: 187.198.144.219/32
-          
       Tags:
         - Key: Name
-          Value: clip_crud_project_sabc_dbsg
+          Value: clip_crud_project_sabc_cluster_sg
+
 # ---------- APP SUBNET-A ----------------
 
   AppSubA:
@@ -240,10 +250,11 @@ Resources:
       RouteTableId: !Ref PrivateRT
 
 # ************************* ENDPOINTS ***********************************
+
 # ----------  ECR ENDPOINTS ----------------
 
   ECSInterfaceEndpoint1:
-    Type: 'AWS::EC2::VPCEndpoint'
+    Type: AWS::EC2::VPCEndpoint
     Properties:
       VpcEndpointType: Interface
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ecs-agent'
@@ -255,7 +266,7 @@ Resources:
         - !Ref APPSG
   
   ECSInterfaceEndpoint2:
-    Type: 'AWS::EC2::VPCEndpoint'
+    Type: AWS::EC2::VPCEndpoint
     Properties:
       PrivateDnsEnabled: true
       VpcEndpointType: Interface
@@ -268,7 +279,7 @@ Resources:
         - !Ref APPSG
         
   ECSInterfaceEndpoint3:
-    Type: 'AWS::EC2::VPCEndpoint'
+    Type: AWS::EC2::VPCEndpoint
     Properties:
       PrivateDnsEnabled: true
       VpcEndpointType: Interface
@@ -283,7 +294,7 @@ Resources:
 # ----------  ECR ENDPOINTS ----------------
 
   ECRInterfaceEndpoint1:
-    Type: 'AWS::EC2::VPCEndpoint'
+    Type: AWS::EC2::VPCEndpoint
     Properties:
       VpcEndpointType: Interface
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ecr.api'
@@ -295,7 +306,7 @@ Resources:
         - !Ref APPSG
   
   ECRInterfaceEndpoint2:
-    Type: 'AWS::EC2::VPCEndpoint'
+    Type: AWS::EC2::VPCEndpoint
     Properties:
       PrivateDnsEnabled: true
       VpcEndpointType: Interface
@@ -362,3 +373,9 @@ Outputs:
     Value: !Ref PublicSubB
     Export: 
       Name: PublicSubB
+  
+  LBSCE:
+    Description: Load Balancer Security Group 
+    Value: !Ref LBSC
+    Export: 
+      Name: LBSC

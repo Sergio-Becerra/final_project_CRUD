@@ -2,6 +2,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 
 Resources:        
 
+# ---------- ROLE FOR TASK ----------------
   TaskRole:
     Type: AWS::IAM::Role
     Properties:
@@ -50,16 +51,20 @@ Resources:
             Resource: 
               -  "*"
 
+# ---------- Service ----------------
+
   ECSService: 
     Type: AWS::ECS::Service
     Properties: 
       Cluster: !ImportValue CrudECS
       LoadBalancers:
         - ContainerName: "clip_crud_project_sabc_container"
-          ContainerPort: 8080
+          ContainerPort: 5000
           TargetGroupArn: !Ref AppTargetGroup
       DesiredCount: 2
       TaskDefinition: !Ref CrudTasKDefinition 
+
+# ---------- SERVICE ----------------
 
   CrudTasKDefinition:
     Type: AWS::ECS::TaskDefinition
@@ -71,7 +76,7 @@ Resources:
           Image: 109832253823.dkr.ecr.us-west-2.amazonaws.com/test-sabc:latest
           PortMappings:
             -
-              ContainerPort: 8080
+              ContainerPort: 5000
               HostPort: 0
               Protocol: "tcp"
           Environment:
@@ -83,6 +88,7 @@ Resources:
         - Key: Name
           Value: "clip_crud_project_sabc_task_definition"
 
+# ---------- LISTENER AND TARGET GROUP ----------------
   LBListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
@@ -90,14 +96,14 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref AppTargetGroup
       LoadBalancerArn: !ImportValue  AppLBE
-      Port: 8080
+      Port: 80
       Protocol: "HTTP"
 
   AppTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       Name: "Crud-project-sabc"
-      Port: 8080
+      Port: 80
       Protocol: "HTTP"
       TargetType: "instance"
       VpcId: !ImportValue CrudVPC
@@ -105,3 +111,73 @@ Resources:
         - Key: Name
           Value: crud-sabc-tg
 
+# ---------- ALARMS ----------------
+  CPUAlarm1:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Cluster alert cpu usage alarm
+      AlarmActions: 
+        - !ImportValue EmailSNS
+      MetricName: CPUUtilization
+      Namespace: AWS/ECS
+      Statistic: Average
+      Period: '60'
+      EvaluationPeriods: '3'
+      Threshold: '50'
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+      - Name: ClusterName
+        Value: !ImportValue CrudECS
+
+  CPUAlarmCritical:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Cluster critical cpu usage alarm
+      AlarmActions: 
+        - !ImportValue EmailSNS
+      MetricName: CPUUtilization
+      Namespace: AWS/ECS
+      Statistic: Average
+      Period: '60'
+      EvaluationPeriods: '3'
+      Threshold: '80'
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+      - Name: ClusterName
+        Value: !ImportValue CrudECS
+
+  CPUAlarmDemo:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Cluster alarm super sensible for demo purposes
+      AlarmActions: 
+        - !ImportValue EmailSNS
+      MetricName: CPUUtilization
+      Namespace: AWS/ECS
+      Statistic: Maximum
+      Period: '60'
+      EvaluationPeriods: '1'
+      Threshold: '5'
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+      - Name: ClusterName
+        Value: !ImportValue CrudECS
+
+  UnhealthyInstances:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Check if there is only one instance healthy running
+      AlarmActions: 
+        - !ImportValue EmailSNS
+      MetricName: HealthyHostCount 
+      Namespace: AWS/ApplicationELB
+      Statistic: Minimum
+      Period: '30'
+      EvaluationPeriods: '3'
+      Threshold: '1'
+      ComparisonOperator: LessThanOrEqualToThreshold
+      Dimensions:
+      - Name: TargetGroup
+        Value: !Ref AppTargetGroup
+      - Name:  LoadBalancer
+        Value: !ImportValue AppLBE
