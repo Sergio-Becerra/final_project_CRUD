@@ -1,4 +1,4 @@
-FROM python
+FROM public.ecr.aws/docker/library/python:latest
 WORKDIR /app
 COPY ./app/requirement.txt /app/
 RUN pip install -r requirement.txt
